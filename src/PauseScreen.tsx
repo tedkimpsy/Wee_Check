@@ -5,7 +5,7 @@ const copy = {
     class: { title: '지금은 수업 중이에요', description: '선생님이 학생들과 함께 수업하고 있어요.', instruction: '지금은 들어갈 수 없어요.\n수업이 끝나면 다시 찾아와 주세요.', thanks: '수업 시간을 배려해 줘서 고마워요!' },
     trip: { title: '선생님은 지금 출장 중이에요', description: '선생님이 학교 밖에서 일을 보고 있어요.', instruction: '지금은 들어갈 수 없어요.\n선생님이 돌아오면 다시 찾아와 주세요.', thanks: '기다려 줘서 고마워요!' },
     meal: { title: '지금은 식사 중이에요', description: '선생님이 식사하며 잠시 쉬고 있어요.', instruction: '지금은 들어갈 수 없어요.\n식사가 끝나면 다시 찾아와 주세요.', thanks: '조금 뒤에 다시 만나요!' },
-    away: { title: '선생님이 잠시 자리를 비웠어요', description: '지금은 Wee클래스가 쉬고 있어요.', instruction: '지금은 들어갈 수 없어요.\n선생님이 돌아오면 다시 찾아와 주세요.', thanks: '기다려 줘서 고마워요!' },
+    away: { title: '선생님이 잠시 자리를 비웠어요', description: 'Wee클래스는 잠시 문을 닫았어요.', instruction: '지금은 들어갈 수 없어요.\n선생님이 돌아오면 다시 찾아와 주세요.', thanks: '기다려 줘서 고마워요!' },
     closed: { title: '지금은 Wee클래스가 쉬고 있어요', description: '편하게 쉬고 놀 수 있는 시간에 다시 만나요.', instruction: '지금은 들어갈 수 없어요.\nWee클래스가 열리면 다시 찾아와 주세요.', thanks: '기다려 줘서 고마워요!' },
     meeting: { title: '지금은 회의 중이에요', description: '선생님들이 함께 이야기를 나누고 있어요.', instruction: '지금은 들어갈 수 없어요.\n회의가 끝나면 다시 찾아와 주세요.', thanks: '기다려 줘서 고마워요!' },
     counseling: { title: '지금은 상담 중이에요', description: '선생님이 친구의 이야기를 듣고 있어요.', instruction: '지금은 들어갈 수 없어요.\n상담이 끝나면 다시 찾아와 주세요.', thanks: '친구가 편하게 이야기할 수 있도록 도와줘서 고마워요!' },

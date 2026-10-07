@@ -3,12 +3,12 @@ export const OPERATION_KEY = 'wee-check-operation-v1'
 export const operationModes: Record<OperationMode, { label: string; message: string }> = {
   open: { label: '개방', message: 'Wee클래스에서 쉬거나 놀고 갈 수 있어요.' },
   closed: { label: '닫힘', message: '지금은 Wee클래스가 쉬는 시간이에요. Wee클래스가 열리면 다시 만나요.' },
-  meeting: { label: '회의중', message: '지금은 회의 중이라 들어올 수 없어요. 회의가 끝난 뒤 다시 찾아와 주세요.' },
-  counseling: { label: '상담중', message: '지금은 상담 중이라 들어올 수 없어요. 상담이 끝난 뒤 다시 찾아와 주세요.' },
-  class: { label: '수업중', message: '지금은 수업 중이에요. 수업이 끝나면 다시 만나요.' },
-  trip: { label: '출장중', message: '선생님이 학교 밖에서 일을 보고 있어요. 돌아오면 다시 만나요.' },
-  meal: { label: '식사중', message: '지금은 식사 중이에요. 식사가 끝나면 다시 만나요.' },
-  away: { label: '부재중', message: '선생님이 잠시 자리를 비웠어요. 돌아오면 다시 만나요.' },
+  meeting: { label: '회의 중', message: '지금은 회의 중이라 들어올 수 없어요. 회의가 끝난 뒤 다시 찾아와 주세요.' },
+  counseling: { label: '상담 중', message: '지금은 상담 중이라 들어올 수 없어요. 상담이 끝난 뒤 다시 찾아와 주세요.' },
+  class: { label: '수업 중', message: '지금은 수업 중이에요. 수업이 끝나면 다시 만나요.' },
+  trip: { label: '출장 중', message: '선생님이 학교 밖에서 일을 보고 있어요. 돌아오면 다시 만나요.' },
+  meal: { label: '식사 중', message: '지금은 식사 중이에요. 식사가 끝나면 다시 만나요.' },
+  away: { label: '부재 중', message: '선생님이 잠시 자리를 비웠어요. 돌아오면 다시 만나요.' },
 }
 export function readOperationMode(): OperationMode {
   try {
@@ -26,8 +26,8 @@ export function validateSlots(slots: TimeSlot[]): string {
   const sorted = [...slots].sort((a, b) => a.start.localeCompare(b.start))
   for (let i = 0; i < sorted.length; i++) {
     const slot = sorted[i]
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.end)) return '여는 시간과 닫는 시간을 입력해 주세요.'
-    if (slot.start >= slot.end) return '닫는 시간은 여는 시간보다 늦게 설정해 주세요. 자정을 넘는 시간은 요일별로 나눠 주세요.'
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.end)) return '여는 시간과 닫는 시간을 입력해야 합니다.'
+    if (slot.start >= slot.end) return '닫는 시간은 여는 시간보다 늦어야 합니다. 자정을 넘는 시간은 요일별로 나눕니다.'
     if (i && sorted[i - 1].end > slot.start) return '개방 시간이 서로 겹칩니다.'
   }
   return ''
