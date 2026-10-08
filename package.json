@@ -4,20 +4,36 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build && tsc -p server/tsconfig.json",
+    "start": "node server-dist/server/index.js",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cookie": "latest",
+    "@fastify/rate-limit": "latest",
+    "@fastify/static": "latest",
+    "@primno/dpapi": "latest",
     "@vitejs/plugin-react": "latest",
+    "argon2": "latest",
+    "better-sqlite3": "latest",
+    "fastify": "latest",
     "lucide-react": "latest",
+    "qrcode": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "latest",
+    "@types/node": "latest",
+    "@types/qrcode": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "typescript": "latest"
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
   }
 }

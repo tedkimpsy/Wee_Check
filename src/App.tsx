@@ -5,7 +5,10 @@ import CounselingForm from './CounselingForm'
 import { readSettings, SETTINGS_KEY, visibleRoster, type SchoolSettings } from './roster'
 import { OPERATION_KEY, OPENING_KEY, effectiveMode, readOpening, readOperationMode, type OpeningSettings, type OperationMode } from './operation'
 import PauseScreen from './PauseScreen'
-import { dailySummary, dateKey, moodLabel, moodOptions, readRecords, STORAGE_KEY, studentKey, timeLabel, type AttendanceRecord, type MoodValue } from './attendance'
+import { dailySummary, dateKey, moodLabel, moodOptions, studentKey, timeLabel, type AttendanceRecord, type MoodValue } from './attendance'
+import { emptyOpening } from './operation'
+import { api } from './api'
+import Login from './Login'
 import { ArrowLeft, Bell, Building2, Check, ChevronRight, Clock3, Cloud, CloudLightning, CloudRain, CloudSun, HelpCircle, LogIn, LogOut, MessageCircleHeart, School, Settings, ShieldCheck, Sun, UserRound, type LucideIcon } from 'lucide-react'
 
 type Direction = 'in' | 'out'
@@ -24,39 +27,44 @@ function Logo({ name }: { name?: string }) {
 }
 
 function App() {
-  const [requests, setRequests] = useState<CounselingRequest[]>(readRequests)
+  const adminRoute = location.pathname.startsWith('/admin')
+  const [requests, setRequests] = useState<CounselingRequest[]>([])
   const [counseling, setCounseling] = useState(false)
   const [urgentRequest, setUrgentRequest] = useState(false)
-  const [settings, setSettings] = useState<SchoolSettings>(readSettings)
+  const [settings, setSettings] = useState<SchoolSettings>({ schoolType: 'elementary', schoolName: '', roster: {} })
   const roster = useMemo(() => visibleRoster(settings), [settings])
-  const [manualMode, setMode] = useState<OperationMode>(readOperationMode)
-  const [opening, setOpening] = useState<OpeningSettings>(readOpening)
+  const [manualMode, setMode] = useState<OperationMode>('open')
+  const [opening, setOpening] = useState<OpeningSettings>(emptyOpening)
   const [now, setNow] = useState(() => new Date())
   const mode = effectiveMode(manualMode, opening, now)
   const [modeError, setModeError] = useState('')
   const entryBlocked = mode !== 'open'
-  const [admin, setAdmin] = useState(false)
-  const [records, setRecords] = useState<AttendanceRecord[]>(readRecords)
+  const [admin, setAdmin] = useState(adminRoute)
+  const [authenticated, setAuthenticated] = useState(!adminRoute)
+  const [loading, setLoading] = useState(true)
+  const [passwordChanged, setPasswordChanged] = useState(true)
+  const [access, setAccess] = useState<any>({ state: 'stopped' })
+  const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [recordError, setRecordError] = useState('')
   const [confirmedAt, setConfirmedAt] = useState('')
   const [today, setToday] = useState(dateKey())
   const summary = dailySummary(records, today)
   const presentStudents = summary.latest.filter(record => record.direction === 'in').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+  const applyBootstrap = (data: any) => {
+    if (data.settings) { setSettings({ schoolType: data.settings.schoolType, schoolName: data.settings.schoolName, roster: data.settings.roster }); setMode(data.settings.manualMode || data.operation?.manualMode || 'open'); setOpening(data.settings.opening || data.operation?.opening || emptyOpening()) }
+    setRecords(data.records || []); setRequests(data.requests || []); if ('passwordChanged' in data) setPasswordChanged(data.passwordChanged); if (data.access) setAccess(data.access)
+  }
+  const reload = async () => { try { const data = adminRoute ? await api.adminBootstrap() : await api.studentBootstrap(); applyBootstrap(data); setAuthenticated(true) } catch (error: any) { if (adminRoute && error?.status === 401) setAuthenticated(false); else setRecordError(error instanceof Error ? error.message : '서버에 연결하지 못했습니다.') } finally { setLoading(false) } }
   useEffect(() => {
-    const sync = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY || event.key === null) setRecords(readRecords())
-      if (event.key === COUNSELING_KEY || event.key === null) setRequests(readRequests())
-      if (event.key === OPERATION_KEY || event.key === null) setMode(readOperationMode())
-      if (event.key === OPENING_KEY || event.key === null) setOpening(readOpening())
-      if (event.key === SETTINGS_KEY || event.key === null) { setSettings(readSettings()); setStep('home'); setGrade(''); setSchoolClass(''); setStudent('') }
-    }
-    window.addEventListener('storage', sync)
+    void reload()
     const refresh = () => { setNow(new Date()); setToday(dateKey()) }
     const timer = window.setInterval(refresh, 1000)
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('storage', sync); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
-  }, [])
+    const events = adminRoute && authenticated ? new EventSource('/api/admin/events') : null
+    if (events) events.addEventListener('update', () => void reload())
+    return () => { events?.close(); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
+  }, [authenticated])
   const [direction, setDirection] = useState<Direction>('in')
   const [step, setStep] = useState<Step>('home')
   const [grade, setGrade] = useState('')
@@ -70,41 +78,29 @@ function App() {
 
   const reset = () => { setGrade(''); setSchoolClass(''); setStudent(''); setConfirmedMood(undefined); setRecordError(''); setStep('home') }
   const start = (next: Direction) => {
-    const storedMode = readOperationMode()
-    const storedOpening = readOpening()
-    const currentMode = effectiveMode(storedMode, storedOpening)
-    setMode(storedMode); setOpening(storedOpening); setNow(new Date())
+    const currentMode = effectiveMode(manualMode, opening)
+    setNow(new Date())
     if (currentMode !== 'open') { reset(); return }
-    setRecords(readRecords()); setToday(dateKey())
+    setToday(dateKey())
     setCounseling(false); setDirection(next); setGrade(''); setSchoolClass(''); setStudent(''); setConfirmedMood(undefined); setRecordError(''); setStep(next === 'out' ? 'exit' : 'grade')
   }
   const changeMode = (next: OperationMode) => {
-    try { localStorage.setItem(OPERATION_KEY, next) }
-    catch { setModeError('운영 모드를 저장하지 못했습니다. 브라우저 저장 공간을 확인해야 합니다.'); return }
-    setMode(next); setModeError('')
+    setMode(next); setModeError(''); void api.saveOperation({ manualMode: next, opening }).catch(error => setModeError(error.message))
   }
   const saveSettings = (next: SchoolSettings) => {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)) }
-    catch { return false }
-    setSettings(next); reset(); return true
+    setSettings(next); reset(); void api.saveSchool(next).catch(error => setRecordError(error.message)); return true
   }
   const saveRequests = (next: CounselingRequest[]) => {
-    try { localStorage.setItem(COUNSELING_KEY, JSON.stringify(next)) }
-    catch { return false }
+    const completed = next.find(item => item.completed && !requests.find(old => old.id === item.id)?.completed)
+    if (completed) void api.completeRequest(completed.id).catch(error => setRecordError(error.message))
     setRequests(next); return true
   }
-  const submitRequest = (details: RequestDetails) => {
-    const stored = readRequests()
-    const previous = stored.find(item => !item.completed && item.grade === grade && item.schoolClass === schoolClass && item.name === student)
-    const timestamp = new Date().toISOString()
-    const updated = previous ? stored.map(item => item.id === previous.id ? { ...item, details, timestamp } : item) : [...stored, { id: crypto.randomUUID(), grade, schoolClass, name: student, timestamp, completed: false, details }]
-    if (!saveRequests(updated)) { setRecordError('상담 신청이 전달되지 않았어요. 선생님께 직접 알려 주세요.'); return }
-    setUrgentRequest(requestPriority(details) === 'urgent' || requestPriority(details) === 'followup'); setConfirmedAt(timestamp); setRecordError(''); setStep('success')
+  const submitRequest = async (details: RequestDetails) => {
+    try { const result = await api.counseling({ grade, schoolClass, name: student, details, priority: requestPriority(details) }); setUrgentRequest(requestPriority(details) === 'urgent' || requestPriority(details) === 'followup'); setConfirmedAt(result.timestamp); setRecordError(''); setStep('success') }
+    catch { setRecordError('상담 신청이 전달되지 않았어요. 선생님께 직접 알려 주세요.') }
   }
   const saveOpening = (next: OpeningSettings) => {
-    try { localStorage.setItem(OPENING_KEY, JSON.stringify(next)) }
-    catch { return false }
-    setOpening(next); setNow(new Date()); return true
+    setOpening(next); setNow(new Date()); void api.saveOperation({ manualMode, opening: next }).catch(error => setModeError(error.message)); return true
   }
   useEffect(() => {
     if (mode !== 'open' && step !== 'home') {
@@ -123,7 +119,7 @@ function App() {
   const chooseStudent = (value: string, selectedGrade = grade, selectedClass = schoolClass) => {
     if (counseling) { setStudent(value); setRecordError(''); setStep('request'); return }
     if (direction === 'in') {
-      const stored = readRecords()
+      const stored = records
       const candidate = { grade: selectedGrade, schoolClass: selectedClass, name: value }
       const latest = dailySummary(stored, dateKey()).latest.find(item => studentKey(item) === studentKey(candidate))
       if (latest?.direction === 'in') { setRecords(stored); setRecordError('이미 들어온 상태예요. 이름이 맞는지 확인하고 선생님께 알려 주세요.'); return }
@@ -131,21 +127,19 @@ function App() {
     }
     saveAttendance(undefined, value, selectedGrade, selectedClass)
   }
-  const saveAttendance = (mood: MoodValue | null | undefined, selectedStudent = student, selectedGrade = grade, selectedClass = schoolClass) => {
-    const storedMode = readOperationMode()
-    const storedOpening = readOpening()
-    const currentMode = effectiveMode(storedMode, storedOpening)
-    setMode(storedMode); setOpening(storedOpening); setNow(new Date())
+  const saveAttendance = async (mood: MoodValue | null | undefined, selectedStudent = student, selectedGrade = grade, selectedClass = schoolClass) => {
+    const currentMode = effectiveMode(manualMode, opening)
+    setNow(new Date())
     if (currentMode !== 'open') { reset(); return }
     const timestamp = new Date().toISOString()
+    const stored = records
     const record: AttendanceRecord = { id: crypto.randomUUID(), grade: selectedGrade, schoolClass: selectedClass, name: selectedStudent, direction, timestamp, ...(direction === 'in' ? { mood: mood ?? null } : {}) }
-    const stored = readRecords()
     const latest = dailySummary(stored, dateKey()).latest.find(item => studentKey(item) === studentKey(record))
     if (direction === 'out' && latest?.direction !== 'in') { setRecords(stored); setRecordError('지금 Wee클래스에 있는 친구 명단에서 이름을 찾지 못했어요. 선생님께 알려 주세요.'); return }
     if (latest?.direction === direction) { setRecordError('이미 들어온 상태예요. 이름이 맞는지 확인하고 선생님께 알려 주세요.'); return }
+    try { const result = await api.attendance({ grade:selectedGrade, schoolClass:selectedClass, name:selectedStudent, direction, mood }); record.id=result.id; record.timestamp=result.timestamp }
+    catch (error) { setRecordError(error instanceof Error ? error.message : '들어오기나 나가기를 확인하지 못했어요. 선생님께 알려 주세요.'); return }
     const next = [...stored, record]
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) }
-    catch { setRecordError('들어오기나 나가기를 확인하지 못했어요. 선생님께 알려 주세요.'); return }
     setRecords(next); setToday(dateKey()); setConfirmedAt(timestamp); setConfirmedMood(direction === 'in' ? mood ?? null : undefined); setRecordError(''); setGrade(selectedGrade); setSchoolClass(selectedClass); setStudent(selectedStudent); setStep('success')
   }
   useEffect(() => {
@@ -154,17 +148,19 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [step, admin, counseling, urgentRequest])
 
+  if (loading) return <main className="loading-page">Wee Check 서버에 연결하는 중…</main>
+  if (adminRoute && !authenticated) return <Login onLogin={() => { setLoading(true); void reload() }} />
   return (
     <main className={`app-shell ${admin ? 'admin-shell' : 'student-shell'}${!admin && step === 'home' && mode === 'open' ? ' view-home' : ''}`}>
       <header className="topbar">
         <Logo name={settings.schoolName} />
         <div className="top-actions">
           {(!entryBlocked || admin) && <button className="icon-button" aria-label="알림"><Bell size={20} /></button>}
-          <button className="admin-nav" onClick={() => { reset(); setAdmin(!admin) }}><Settings size={18} />{admin ? '학생 화면' : '관리자'}</button>
+          {adminRoute ? <button className="admin-nav" onClick={() => { void api.logout().then(() => setAuthenticated(false)) }}><Settings size={18} />로그아웃</button> : !api.studentToken() && <button className="admin-nav" onClick={() => { location.href='/admin' }}><Settings size={18} />관리자</button>}
         </div>
       </header>
 
-      {admin ? <Admin requests={requests} onSaveRequests={saveRequests} records={records} roster={roster} settings={settings} onSaveSettings={saveSettings} mode={mode} manualMode={manualMode} opening={opening} onSaveOpening={saveOpening} onModeChange={changeMode} modeError={modeError} onBack={() => { setAdmin(false); reset() }} /> : mode !== 'open' ? <PauseScreen mode={mode} /> : <section className={`kiosk ${step === 'home' ? 'kiosk-home' : ''}`}>
+      {admin ? <Admin requests={requests} onSaveRequests={saveRequests} records={records} roster={roster} settings={settings} onSaveSettings={saveSettings} mode={mode} manualMode={manualMode} opening={opening} onSaveOpening={saveOpening} onModeChange={changeMode} modeError={modeError} onBack={() => { if (access.studentUrl) window.open(access.studentUrl, '_blank', 'noopener,noreferrer'); else setModeError('학생 접속을 먼저 시작해야 합니다.') }} passwordChanged={passwordChanged} access={access} onStartAccess={async()=>{setAccess({state:'starting'});try{setAccess(await api.startAccess())}catch(e){setAccess({state:'error',message:e instanceof Error?e.message:'시작하지 못했습니다.'})}}} onStopAccess={async()=>{await api.stopAccess();setAccess({state:'stopped'})}} onChangePassword={async(password)=>{await api.changePassword(password);setPasswordChanged(true)}} onBackup={async()=>{const result=await api.backup();return result.path}} onListBackups={async()=>{const result=await api.backups();return result.files}} onRestore={async(name)=>{await api.restore(name)}} onCloseAcademicYear={async()=>{const result=await api.closeAcademicYear();await reload();return result.backup}} /> : mode !== 'open' ? <PauseScreen mode={mode} /> : <section className={`kiosk ${step === 'home' ? 'kiosk-home' : ''}`}>
         {step === 'home' && <>
           <div className="hero">
             <div className="hero-copy">

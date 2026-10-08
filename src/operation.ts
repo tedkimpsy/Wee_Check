@@ -40,7 +40,7 @@ export function readOpening(): OpeningSettings {
   return emptyOpening()
 }
 export function effectiveMode(mode: OperationMode, opening: OpeningSettings, now = new Date()): OperationMode {
-  if (isSpecialMode(mode) || opening.method === 'manual') return mode
+  if (opening.method === 'manual' || mode !== 'open') return mode
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now)
   const value = (type: string) => parts.find(part => part.type === type)?.value || ''
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday'))
