@@ -5,5 +5,7 @@ coverage
 .DS_Store
 *.local
 *.tsbuildinfo
+.ui-test-data/
+release/
 vite.config.js
 vite.config.d.ts

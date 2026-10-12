@@ -8,6 +8,7 @@
     "dev:web": "vite --host 127.0.0.1",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build && tsc -p server/tsconfig.json",
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-package.ps1",
     "start": "node server-dist/server/index.js",
     "test": "vitest run"
   },

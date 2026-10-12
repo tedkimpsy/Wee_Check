@@ -46,6 +46,8 @@ function App() {
   const [access, setAccess] = useState<any>({ state: 'stopped' })
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [recordError, setRecordError] = useState('')
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected')
+  const [lastUpdated, setLastUpdated] = useState(() => new Date())
   const [confirmedAt, setConfirmedAt] = useState('')
   const [today, setToday] = useState(dateKey())
   const summary = dailySummary(records, today)
@@ -54,7 +56,7 @@ function App() {
     if (data.settings) { setSettings({ schoolType: data.settings.schoolType, schoolName: data.settings.schoolName, roster: data.settings.roster }); setMode(data.settings.manualMode || data.operation?.manualMode || 'open'); setOpening(data.settings.opening || data.operation?.opening || emptyOpening()) }
     setRecords(data.records || []); setRequests(data.requests || []); if ('passwordChanged' in data) setPasswordChanged(data.passwordChanged); if (data.access) setAccess(data.access)
   }
-  const reload = async () => { try { const data = adminRoute ? await api.adminBootstrap() : await api.studentBootstrap(); applyBootstrap(data); setAuthenticated(true) } catch (error: any) { if (adminRoute && error?.status === 401) setAuthenticated(false); else setRecordError(error instanceof Error ? error.message : '서버에 연결하지 못했습니다.') } finally { setLoading(false) } }
+  const reload = async () => { try { const data = adminRoute ? await api.adminBootstrap() : await api.studentBootstrap(); applyBootstrap(data); setAuthenticated(true); setConnectionStatus('connected'); setLastUpdated(new Date()) } catch (error: any) { if (adminRoute && error?.status === 401) setAuthenticated(false); else { setConnectionStatus('reconnecting'); setRecordError(error instanceof Error ? error.message : '서버에 연결하지 못했습니다.') } } finally { setLoading(false) } }
   useEffect(() => {
     void reload()
     const refresh = () => { setNow(new Date()); setToday(dateKey()) }
@@ -62,7 +64,12 @@ function App() {
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     const events = adminRoute && authenticated ? new EventSource('/api/admin/events') : null
-    if (events) events.addEventListener('update', () => void reload())
+    if (events) {
+      events.addEventListener('open', () => setConnectionStatus('connected'))
+      events.addEventListener('update', () => void reload())
+      events.addEventListener('counseling', () => void reload())
+      events.addEventListener('error', () => setConnectionStatus('reconnecting'))
+    }
     return () => { events?.close(); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
   }, [authenticated])
   const [direction, setDirection] = useState<Direction>('in')
@@ -84,23 +91,29 @@ function App() {
     setToday(dateKey())
     setCounseling(false); setDirection(next); setGrade(''); setSchoolClass(''); setStudent(''); setConfirmedMood(undefined); setRecordError(''); setStep(next === 'out' ? 'exit' : 'grade')
   }
-  const changeMode = (next: OperationMode) => {
-    setMode(next); setModeError(''); void api.saveOperation({ manualMode: next, opening }).catch(error => setModeError(error.message))
+  const changeMode = async (next: OperationMode) => {
+    setModeError('')
+    try { await api.saveOperation({ manualMode: next, opening }); setMode(next); setNow(new Date()) }
+    catch (error) { const message = error instanceof Error ? error.message : '운영 상태를 저장하지 못했습니다.'; setModeError(message); throw error }
   }
-  const saveSettings = (next: SchoolSettings) => {
-    setSettings(next); reset(); void api.saveSchool(next).catch(error => setRecordError(error.message)); return true
+  const saveSettings = async (next: SchoolSettings) => {
+    await api.saveSchool(next)
+    setSettings(next)
+    reset()
   }
-  const saveRequests = (next: CounselingRequest[]) => {
+  const saveRequests = async (next: CounselingRequest[]) => {
     const completed = next.find(item => item.completed && !requests.find(old => old.id === item.id)?.completed)
-    if (completed) void api.completeRequest(completed.id).catch(error => setRecordError(error.message))
-    setRequests(next); return true
+    if (completed) await api.completeRequest(completed.id)
+    setRequests(next)
   }
   const submitRequest = async (details: RequestDetails) => {
     try { const result = await api.counseling({ grade, schoolClass, name: student, details, priority: requestPriority(details) }); setUrgentRequest(requestPriority(details) === 'urgent' || requestPriority(details) === 'followup'); setConfirmedAt(result.timestamp); setRecordError(''); setStep('success') }
     catch { setRecordError('상담 신청이 전달되지 않았어요. 선생님께 직접 알려 주세요.') }
   }
-  const saveOpening = (next: OpeningSettings) => {
-    setOpening(next); setNow(new Date()); void api.saveOperation({ manualMode, opening: next }).catch(error => setModeError(error.message)); return true
+  const saveOpening = async (next: OpeningSettings) => {
+    setModeError('')
+    try { await api.saveOperation({ manualMode, opening: next }); setOpening(next); setNow(new Date()) }
+    catch (error) { const message = error instanceof Error ? error.message : '개방 설정을 저장하지 못했습니다.'; setModeError(message); throw error }
   }
   useEffect(() => {
     if (mode !== 'open' && step !== 'home') {
@@ -152,15 +165,15 @@ function App() {
   if (adminRoute && !authenticated) return <Login onLogin={() => { setLoading(true); void reload() }} />
   return (
     <main className={`app-shell ${admin ? 'admin-shell' : 'student-shell'}${!admin && step === 'home' && mode === 'open' ? ' view-home' : ''}`}>
-      <header className="topbar">
+      {!adminRoute && <header className="topbar">
         <Logo name={settings.schoolName} />
         <div className="top-actions">
           {(!entryBlocked || admin) && <button className="icon-button" aria-label="알림"><Bell size={20} /></button>}
           {adminRoute ? <button className="admin-nav" onClick={() => { void api.logout().then(() => setAuthenticated(false)) }}><Settings size={18} />로그아웃</button> : !api.studentToken() && <button className="admin-nav" onClick={() => { location.href='/admin' }}><Settings size={18} />관리자</button>}
         </div>
-      </header>
+      </header>}
 
-      {admin ? <Admin requests={requests} onSaveRequests={saveRequests} records={records} roster={roster} settings={settings} onSaveSettings={saveSettings} mode={mode} manualMode={manualMode} opening={opening} onSaveOpening={saveOpening} onModeChange={changeMode} modeError={modeError} onBack={() => { if (access.studentUrl) window.open(access.studentUrl, '_blank', 'noopener,noreferrer'); else setModeError('학생 접속을 먼저 시작해야 합니다.') }} passwordChanged={passwordChanged} access={access} onStartAccess={async()=>{setAccess({state:'starting'});try{setAccess(await api.startAccess())}catch(e){setAccess({state:'error',message:e instanceof Error?e.message:'시작하지 못했습니다.'})}}} onStopAccess={async()=>{await api.stopAccess();setAccess({state:'stopped'})}} onChangePassword={async(password)=>{await api.changePassword(password);setPasswordChanged(true)}} onBackup={async()=>{const result=await api.backup();return result.path}} onListBackups={async()=>{const result=await api.backups();return result.files}} onRestore={async(name)=>{await api.restore(name)}} onCloseAcademicYear={async()=>{const result=await api.closeAcademicYear();await reload();return result.backup}} /> : mode !== 'open' ? <PauseScreen mode={mode} /> : <section className={`kiosk ${step === 'home' ? 'kiosk-home' : ''}`}>
+      {admin ? <Admin requests={requests} onSaveRequests={saveRequests} records={records} roster={roster} settings={settings} onSaveSettings={saveSettings} mode={mode} manualMode={manualMode} opening={opening} onSaveOpening={saveOpening} onModeChange={changeMode} modeError={modeError} passwordChanged={passwordChanged} access={access} connectionStatus={connectionStatus} lastUpdated={lastUpdated} onLogout={async()=>{await api.logout();setAuthenticated(false)}} onStartAccess={async()=>{setAccess({state:'starting'});try{setAccess(await api.startAccess())}catch(e){setAccess({state:'error',message:e instanceof Error?e.message:'시작하지 못했습니다.'});throw e}}} onStopAccess={async()=>{await api.stopAccess();setAccess({state:'stopped'})}} onChangePassword={async(password)=>{await api.changePassword(password);setPasswordChanged(true)}} onBackup={async()=>{const result=await api.backup();return result.path}} onListBackups={async()=>{const result=await api.backups();return result.files}} onRestore={async(name)=>{await api.restore(name)}} onCloseAcademicYear={async()=>{const result=await api.closeAcademicYear();await reload();return result.backup}} /> : mode !== 'open' ? <PauseScreen mode={mode} /> : <section className={`kiosk ${step === 'home' ? 'kiosk-home' : ''}`}>
         {step === 'home' && <>
           <div className="hero">
             <div className="hero-copy">

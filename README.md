@@ -21,10 +21,15 @@ npm run dev
 
 ## 배포용 빌드
 
-```bash
-npm run build
-npm run preview
+Windows 배포본은 다음 명령으로 만듭니다.
+
+```powershell
+npm run package:windows
 ```
+
+`release\Wee-Check-Windows`에 프론트엔드·로컬 서버·검증된 실행 의존성과 `bin\cloudflared.exe`가 함께 만들어집니다. 패키징 과정은 Cloudflare Tunnel 실행 파일의 버전을 직접 확인하며, 파일을 찾지 못하거나 실행할 수 없으면 배포를 실패 처리합니다. 따라서 정상 생성된 배포본은 대상 PC의 PATH나 별도 Cloudflare 설치에 의존하지 않습니다.
+
+빌드 PC에서 `cloudflared.exe`를 찾는 순서는 `-CloudflaredSource` 인수, `WEE_CHECK_CLOUDFLARED_SOURCE` 환경 변수, 프로젝트의 `bin\cloudflared.exe`, 시스템 PATH 순입니다. 배포본은 `release\Wee-Check-Windows\scripts\start-we-check.ps1`로 실행합니다.
 
 ## 로컬 서버 운영
 
@@ -36,11 +41,13 @@ npm run build
 npm start
 ```
 
-최초 관리자 비밀번호는 `0000`입니다. 로그인 후 관리자 화면의 경고 배너에서 8자 이상의 새 비밀번호로 바꾸는 것을 권장합니다. `cloudflared`가 PATH에 설치되어 있어야 **학생 접속 시작** 버튼으로 일일 QR을 만들 수 있습니다. 개발·점검 시에는 `WEE_CHECK_NO_TUNNEL=1`을 지정하면 로컬 학생 주소를 사용합니다.
+최초 관리자 비밀번호는 `0000`입니다. 로그인 후 관리자 화면의 경고 배너에서 8자 이상의 새 비밀번호로 바꾸는 것을 권장합니다. 프로그램을 실행하면 관리자 서버와 학생 서버가 함께 시작되고, 동봉된 `cloudflared` 터널과 일일 QR도 자동으로 준비됩니다. 개발·점검 시에는 `WEE_CHECK_NO_TUNNEL=1`을 지정하면 외부 터널 대신 로컬 학생 주소를 자동으로 사용합니다.
 
 ```powershell
 .\scripts\install-cloudflared.ps1
 ```
+
+위 설치 스크립트는 배포 대상 PC용이 아니라, 패키징할 원본 `cloudflared.exe`가 없는 빌드 PC에서만 사용합니다.
 
 데이터베이스와 암호화 백업은 `%LOCALAPPDATA%\WeeCheck`에 저장됩니다. 이름·연락처·상담 답변은 AES-256-GCM으로 암호화되고 마스터 키는 Windows DPAPI로 보호됩니다. 서버 모드에서는 기존 브라우저 `localStorage` 기록을 가져오지 않습니다.
 

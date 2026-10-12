@@ -21,6 +21,13 @@ let tunnel: ChildProcessWithoutNullStreams | null = null
 let tunnelStatus: { state: 'stopped'|'starting'|'online'|'error'; publicUrl?: string; message?: string; qr?: string } = { state: 'stopped' }
 let currentStudentToken = ''
 
+function cloudflaredExecutable() {
+  if (process.env.WEE_CHECK_CLOUDFLARED_PATH) return process.env.WEE_CHECK_CLOUDFLARED_PATH
+  const bundledName = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
+  const bundled = resolve(process.cwd(), 'bin', bundledName)
+  return existsSync(bundled) ? bundled : 'cloudflared'
+}
+
 function emit(type='update') { for (const reply of listeners) reply.write(`event: ${type}\ndata: ${JSON.stringify({ at: Date.now() })}\n\n`) }
 function bearer(header?: string) { return header?.startsWith('Bearer ') ? header.slice(7) : '' }
 function requireAdmin(request: any, reply: any, done: any) { const sid=request.cookies?.wee_admin; const expiry=sid&&adminSessions.get(sid); if(!expiry||expiry<Date.now()) return reply.code(401).send({error:'로그인이 필요합니다.'}); done() }
@@ -48,11 +55,12 @@ async function startAccess() {
   const localUrl='http://127.0.0.1:4174'
   if(process.env.WEE_CHECK_NO_TUNNEL==='1') { const publicUrl=localUrl, studentUrl=`${publicUrl}/#/s/${currentStudentToken}`; store.createAccessSession(currentStudentToken,publicUrl); tunnelStatus={state:'online',publicUrl,studentUrl,qr:await QRCode.toDataURL(studentUrl)} as any; emit(); return tunnelStatus }
   return await new Promise<any>((resolvePromise)=>{
-    try { tunnel=spawn('cloudflared',['tunnel','--url',localUrl,'--no-autoupdate'],{windowsHide:true}); let settled=false
+    try { tunnel=spawn(cloudflaredExecutable(),['tunnel','--url',localUrl,'--no-autoupdate'],{windowsHide:true}); let settled=false
       const handle=(data:Buffer)=>{ const text=data.toString(); const match=text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i); if(match&&!settled){settled=true; const publicUrl=match[0], studentUrl=`${publicUrl}/#/s/${currentStudentToken}`; store.createAccessSession(currentStudentToken,publicUrl); QRCode.toDataURL(studentUrl).then(qr=>{tunnelStatus={state:'online',publicUrl,studentUrl,qr} as any;emit();resolvePromise(tunnelStatus)})} }
       tunnel.stdout.on('data',handle); tunnel.stderr.on('data',handle); tunnel.on('exit',()=>{tunnel=null;if(tunnelStatus.state!=='stopped'){tunnelStatus={state:'error',message:'학생 접속 터널이 종료되었습니다.'};store.stopSessions();emit()}})
-      setTimeout(()=>{if(!settled){settled=true;tunnel?.kill();tunnelStatus={state:'error',message:'cloudflared를 시작하지 못했습니다. 설치와 인터넷 연결을 확인하세요.'};resolvePromise(tunnelStatus)}},15000)
-    } catch { tunnelStatus={state:'error',message:'cloudflared를 실행할 수 없습니다.'};resolvePromise(tunnelStatus) }
+      tunnel.on('error',()=>{if(!settled){settled=true;tunnel=null;tunnelStatus={state:'error',message:'cloudflared를 실행할 수 없습니다. 배포 파일을 확인해 주세요.'};emit();resolvePromise(tunnelStatus)}})
+      setTimeout(()=>{if(!settled){settled=true;tunnel?.kill();tunnelStatus={state:'error',message:'cloudflared를 시작하지 못했습니다. 설치와 인터넷 연결을 확인하세요.'};emit();resolvePromise(tunnelStatus)}},15000)
+    } catch { tunnelStatus={state:'error',message:'cloudflared를 실행할 수 없습니다.'};emit();resolvePromise(tunnelStatus) }
   })
 }
 admin.post('/api/admin/access/start',{preHandler:requireAdmin},async()=>startAccess())
@@ -75,8 +83,14 @@ student.post('/api/student/counseling',async(request:any,reply)=>{try{const body
 if(existsSync(dist)) await student.register(staticPlugin,{root:dist,wildcard:false})
 student.setNotFoundHandler((request,reply)=>request.url.startsWith('/admin')||request.url.startsWith('/api/admin')?reply.code(404).send({error:'이 주소에서는 관리자 화면을 사용할 수 없습니다.'}):existsSync(resolve(dist,'index.html'))?reply.sendFile('index.html'):reply.code(404).send({error:'학생 화면을 먼저 빌드해야 합니다.'}))
 
-await admin.listen({host:'127.0.0.1',port:Number(process.env.WEE_CHECK_ADMIN_PORT||4173)})
-await student.listen({host:'127.0.0.1',port:Number(process.env.WEE_CHECK_STUDENT_PORT||4174)})
+await Promise.all([
+  admin.listen({host:'127.0.0.1',port:Number(process.env.WEE_CHECK_ADMIN_PORT||4173)}),
+  student.listen({host:'127.0.0.1',port:Number(process.env.WEE_CHECK_STUDENT_PORT||4174)}),
+])
+void startAccess().catch(error => {
+  tunnelStatus={state:'error',message:error instanceof Error?error.message:'학생 접속 터널을 시작하지 못했습니다.'}
+  emit()
+})
 setInterval(()=>{ const active=store.activeSession(); if(!active&&tunnelStatus.state==='online'){tunnelStatus={state:'stopped'};currentStudentToken='';tunnel?.kill();tunnel=null;emit()} },30_000).unref()
 setInterval(()=>{ try { store.backup() } catch { /* The admin dashboard reports explicit backup failures. */ } },24*60*60*1000).unref()
-console.log('Wee Check 관리자: http://127.0.0.1:4173/admin')
+console.log(`Wee Check 관리자: http://127.0.0.1:${process.env.WEE_CHECK_ADMIN_PORT||4173}/admin`)

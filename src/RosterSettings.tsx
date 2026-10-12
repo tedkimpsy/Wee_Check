@@ -1,36 +1,92 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Check, FileSpreadsheet, Save, Upload } from 'lucide-react'
 import { gradeCount, parseRoster, schoolTypes, visibleRoster, type Roster, type SchoolSettings, type SchoolType } from './roster'
 
-export default function RosterSettings({ settings, onSave }: { settings: SchoolSettings; onSave: (settings: SchoolSettings) => boolean }) {
+type Props = {
+  settings: SchoolSettings
+  onSave: (settings: SchoolSettings) => Promise<void>
+  view?: 'school' | 'roster'
+}
+
+const rosterCount = (roster: Roster) => Object.values(roster).reduce(
+  (sum, classes) => sum + Object.values(classes).reduce((count, names) => count + names.length, 0), 0,
+)
+
+export default function RosterSettings({ settings, onSave, view = 'roster' }: Props) {
+  const [schoolName, setSchoolName] = useState(settings.schoolName)
+  const [schoolType, setSchoolType] = useState<SchoolType>(settings.schoolType)
   const [text, setText] = useState('')
   const [preview, setPreview] = useState<Roster | null>(null)
   const [message, setMessage] = useState('')
-  const [schoolName, setSchoolName] = useState(settings.schoolName)
-  const current = visibleRoster(settings)
-  const count = (roster: Roster) => Object.values(roster).reduce((sum, classes) => sum + Object.values(classes).reduce((n, names) => n + names.length, 0), 0)
-  const changeType = (schoolType: SchoolType) => {
-    if (onSave({ ...settings, schoolType })) { setPreview(null); setMessage(`${schoolTypes[schoolType]} 설정을 저장했습니다.`) }
-    else setMessage('설정을 저장하지 못했습니다. 브라우저 저장 공간을 확인해야 합니다.')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const current = useMemo(() => visibleRoster(settings), [settings])
+
+  useEffect(() => {
+    setSchoolName(settings.schoolName)
+    setSchoolType(settings.schoolType)
+  }, [settings.schoolName, settings.schoolType])
+
+  const runSave = async (next: SchoolSettings, success: string) => {
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await onSave(next)
+      setMessage(success)
+      return true
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      return false
+    } finally {
+      setBusy(false)
+    }
   }
-  const changeName = (value: string) => {
-    setSchoolName(value)
-    if (onSave({ ...settings, schoolName: value })) setMessage('')
-    else setMessage('학교 이름을 저장하지 못했습니다. 브라우저 저장 공간을 확인해야 합니다.')
+
+  if (view === 'school') return <section className="admin-v3-card roster-settings">
+    <header className="admin-v3-card-head"><h2>학교 정보</h2><span>학생 화면과 관리자 메뉴에 표시됩니다.</span></header>
+    <div className="admin-v3-form-grid">
+      <label>학교급<select value={schoolType} onChange={event => setSchoolType(event.target.value as SchoolType)}>{Object.entries(schoolTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label>학교 이름<input type="text" value={schoolName} placeholder="예: 한마음초등학교" onChange={event => setSchoolName(event.target.value)} /></label>
+    </div>
+    <p className="admin-v3-help">{schoolTypes[schoolType]} 기준으로 1~{gradeCount(schoolType)}학년을 표시합니다. 학교급을 바꿔도 기존 명렬표 데이터는 보존됩니다.</p>
+    {error && <p className="admin-v3-form-error" role="alert">{error}</p>}
+    {message && <p className="admin-v3-form-success" role="status"><Check size={16}/>{message}</p>}
+    <div className="admin-v3-form-actions"><button className="admin-v3-primary" disabled={busy || !schoolName.trim()} onClick={() => void runSave({ ...settings, schoolName: schoolName.trim(), schoolType }, '학교 정보를 저장했습니다.')}><Save size={17}/>{busy ? '저장 중…' : '학교 정보 저장'}</button></div>
+  </section>
+
+  const loadCurrent = () => {
+    const rows = Object.entries(current).flatMap(([grade, classes]) => Object.entries(classes).flatMap(([schoolClass, names]) => names.map(name => `${grade.replace('학년', '')}\t${schoolClass.replace('반', '')}\t${name}`)))
+    setText(`학년\t반\t이름\n${rows.join('\n')}`)
+    setPreview(null)
+    setError('')
+    setMessage('현재 명렬표를 편집 영역에 불러왔습니다.')
   }
   const check = () => {
-    try { setPreview(parseRoster(text, settings.schoolType)); setMessage('미리보기를 확인한 뒤 아래 적용 버튼을 눌러야 합니다.') }
-    catch (error) { setPreview(null); setMessage(error instanceof Error ? error.message : '표를 확인해야 합니다.') }
+    setError('')
+    setMessage('')
+    try {
+      setPreview(parseRoster(text, settings.schoolType))
+      setMessage('미리보기를 확인한 뒤 전체 교체를 눌러 주세요.')
+    } catch (reason) {
+      setPreview(null)
+      setError(reason instanceof Error ? reason.message : '입력 형식을 확인해 주세요.')
+    }
   }
-  return <section className="admin-panel roster-settings">
-    <div className="panel-heading"><h2>학교 설정 · 학생 명렬표</h2><span>현재 {count(current)}명</span></div>
-    <label className="school-level-field">학교급<select value={settings.schoolType} onChange={event => changeType(event.target.value as SchoolType)}>{Object.entries(schoolTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    <label className="school-level-field">학교 이름<input type="text" value={schoolName} placeholder="예: ○○초등학교" onChange={event => changeName(event.target.value)} /></label>
-    <p className="operation-help">{schoolTypes[settings.schoolType]}는 1~{gradeCount(settings.schoolType)}학년을 표시합니다. 안내 문구는 모든 학교급에 공통으로 사용합니다. 학교급 변경 시 기존 명렬표는 보관하며 해당 학년만 표시합니다.</p>
-    <h3>엑셀에서 학생 명렬표 가져오기</h3>
-    <p className="operation-help">엑셀에서 학년·반·이름 순서의 세 열을 복사해 붙여넣어야 합니다. 쉼표로 구분한 표도 가능합니다. 명렬표 전체를 교체하며 기존 출입 기록은 유지합니다.</p>
-    <label className="sr-only" htmlFor="roster-input">학생 명렬표 입력</label><textarea id="roster-input" value={text} placeholder={'학년\t반\t이름\n1\t1\t김민준\n1\t1\t김서연'} onChange={event => { setText(event.target.value); setPreview(null); setMessage('') }} />
-    <div className="roster-actions"><button className="admin-nav" onClick={() => { setText('학년\t반\t이름\n' + Object.entries(current).flatMap(([grade, classes]) => Object.entries(classes).flatMap(([label, names]) => names.map(name => `${grade}\t${label}\t${name}`))).join('\n')); setPreview(null); setMessage('현재 명렬표를 불러왔습니다. 수정 후 미리보기를 눌러야 합니다.') }}>현재 명렬표 불러오기</button><button className="admin-nav" onClick={check}>미리보기</button></div>
-    {message && <p className="operation-help" role="status">{message}</p>}
-    {preview && <div className="roster-preview"><h3>변경할 명렬표: {count(preview)}명</h3><div className="table-scroll"><table><thead><tr><th>학년 / 반</th><th>인원</th><th>이름</th></tr></thead><tbody>{Object.entries(preview).flatMap(([grade, classes]) => Object.entries(classes).map(([label, names]) => <tr key={`${grade}-${label}`}><td>{grade} {label}</td><td>{names.length}명</td><td>{names.join(', ')}</td></tr>))}</tbody></table></div><button className="primary-button" onClick={() => { if (onSave({ ...settings, roster: preview })) { setPreview(null); setMessage('학생 명렬표를 변경했습니다.') } else setMessage('명렬표를 저장하지 못했습니다. 브라우저 저장 공간을 확인해야 합니다.') }}>이 명렬표로 전체 교체</button></div>}
+  const replaceRoster = async () => {
+    if (!preview) return
+    if (!window.confirm(`현재 학생 명렬표를 ${rosterCount(preview)}명의 새 명렬표로 교체할까요? 기존 출입 기록은 유지됩니다.`)) return
+    if (await runSave({ ...settings, roster: preview }, '학생 명렬표를 교체했습니다.')) setPreview(null)
+  }
+
+  return <section className="admin-v3-card roster-settings">
+    <header className="admin-v3-card-head"><h2>학생 명렬표 전체 교체</h2><span>현재 {rosterCount(current)}명</span></header>
+    <div className="admin-v3-roster-guide"><FileSpreadsheet size={22}/><p><strong>엑셀에서 학년·반·이름 열을 복사해 붙여넣으세요.</strong><span>탭 또는 쉼표로 구분된 값을 지원합니다. 교체해도 기존 출입·상담 기록은 유지됩니다.</span></p></div>
+    <label className="sr-only" htmlFor="roster-input">학생 명렬표 입력</label>
+    <textarea id="roster-input" value={text} placeholder={'학년\t반\t이름\n1\t1\t김서연\n1\t1\t박도윤'} onChange={event => { setText(event.target.value); setPreview(null); setMessage(''); setError('') }} />
+    <div className="admin-v3-form-actions split"><button className="admin-v3-secondary" onClick={loadCurrent}>현재 명렬표 불러오기</button><button className="admin-v3-primary" disabled={!text.trim()} onClick={check}><Upload size={17}/> 미리보기</button></div>
+    {error && <p className="admin-v3-form-error" role="alert">{error}</p>}
+    {message && <p className="admin-v3-form-success" role="status"><Check size={16}/>{message}</p>}
+    {preview && <div className="admin-v3-roster-preview"><h3>교체할 명렬표 · {rosterCount(preview)}명</h3><div className="admin-v3-table-wrap"><table className="admin-v3-table"><thead><tr><th>학년·반</th><th>인원</th><th>이름</th></tr></thead><tbody>{Object.entries(preview).flatMap(([grade, classes]) => Object.entries(classes).map(([schoolClass, names]) => <tr key={`${grade}-${schoolClass}`}><td>{grade} {schoolClass}</td><td>{names.length}명</td><td>{names.join(', ')}</td></tr>))}</tbody></table></div><button className="admin-v3-primary" disabled={busy} onClick={() => void replaceRoster()}>{busy ? '교체 중…' : '이 명렬표로 전체 교체'}</button></div>}
   </section>
 }
