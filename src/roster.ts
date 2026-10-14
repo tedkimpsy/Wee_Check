@@ -1,7 +1,9 @@
 import { defaultRoster } from './defaultRoster'
 export type Roster = Record<string, Record<string, string[]>>
 export type SchoolType = 'elementary' | 'middle' | 'high'
-export type SchoolSettings = { schoolType: SchoolType; roster: Roster; schoolName: string }
+export type RosterStudent = { id: string; name: string }
+export type RosterClass = { id: string; grade: string; name: string; students: RosterStudent[] }
+export type SchoolSettings = { schoolType: SchoolType; roster: Roster; schoolName: string; rosterDetails?: RosterClass[] }
 export const SETTINGS_KEY = 'wee-check-roster-v1'
 export const schoolTypes: Record<SchoolType, string> = { elementary: '초등학교', middle: '중학교', high: '고등학교' }
 export const gradeCount = (type: SchoolType) => type === 'elementary' ? 6 : 3

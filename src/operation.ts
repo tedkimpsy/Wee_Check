@@ -17,11 +17,28 @@ export function readOperationMode(): OperationMode {
   } catch { return 'open' }
 }
 export const isSpecialMode = (mode: OperationMode) => mode !== 'open' && mode !== 'closed'
-export type TimeSlot = { start: string; end: string }
-export type OpeningSettings = { method: 'manual' | 'schedule'; week: TimeSlot[][] }
+export type CapacitySettings = { enabled: boolean; limit: number; manualMaxPlayMinutes: number }
+export type TimeSlot = { start: string; end: string; grades: string[]; maxPlayMinutes: number }
+export type OpeningSettings = { method: 'manual' | 'schedule'; week: TimeSlot[][]; capacity: CapacitySettings }
 export const OPENING_KEY = 'wee-check-opening-v1'
 export const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-export const emptyOpening = (): OpeningSettings => ({ method: 'manual', week: Array.from({ length: 7 }, () => []) })
+export const defaultCapacity = (): CapacitySettings => ({ enabled: true, limit: 10, manualMaxPlayMinutes: 30 })
+export const normalizeSlot = (slot: Partial<TimeSlot>): TimeSlot => ({
+  start: typeof slot.start === 'string' ? slot.start : '09:00',
+  end: typeof slot.end === 'string' ? slot.end : '10:00',
+  grades: Array.isArray(slot.grades) ? slot.grades.filter(grade => typeof grade === 'string') : [],
+  maxPlayMinutes: Number.isInteger(slot.maxPlayMinutes) && Number(slot.maxPlayMinutes) >= 5 && Number(slot.maxPlayMinutes) <= 180 ? Number(slot.maxPlayMinutes) : 30,
+})
+export const normalizeOpening = (value?: Partial<OpeningSettings> | null): OpeningSettings => ({
+  method: value?.method === 'schedule' ? 'schedule' : 'manual',
+  week: Array.from({ length: 7 }, (_, day) => Array.isArray(value?.week?.[day]) ? value!.week![day].map(normalizeSlot) : []),
+  capacity: {
+    enabled: value?.capacity?.enabled !== false,
+    limit: Number.isInteger(value?.capacity?.limit) && Number(value?.capacity?.limit) >= 1 && Number(value?.capacity?.limit) <= 99 ? Number(value?.capacity?.limit) : 10,
+    manualMaxPlayMinutes: Number.isInteger(value?.capacity?.manualMaxPlayMinutes) && Number(value?.capacity?.manualMaxPlayMinutes) >= 5 && Number(value?.capacity?.manualMaxPlayMinutes) <= 180 ? Number(value?.capacity?.manualMaxPlayMinutes) : 30,
+  },
+})
+export const emptyOpening = (): OpeningSettings => normalizeOpening(null)
 export function validateSlots(slots: TimeSlot[]): string {
   const sorted = [...slots].sort((a, b) => a.start.localeCompare(b.start))
   for (let i = 0; i < sorted.length; i++) {
@@ -29,21 +46,28 @@ export function validateSlots(slots: TimeSlot[]): string {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.end)) return '여는 시간과 닫는 시간을 입력해야 합니다.'
     if (slot.start >= slot.end) return '닫는 시간은 여는 시간보다 늦어야 합니다. 자정을 넘는 시간은 요일별로 나눕니다.'
     if (i && sorted[i - 1].end > slot.start) return '개방 시간이 서로 겹칩니다.'
+    if (!Number.isInteger(slot.maxPlayMinutes) || slot.maxPlayMinutes < 5 || slot.maxPlayMinutes > 180) return '최대 놀이시간은 5분부터 180분까지 입력해야 합니다.'
   }
   return ''
 }
 export function readOpening(): OpeningSettings {
   try {
     const value = JSON.parse(localStorage.getItem(OPENING_KEY) || 'null')
-    if (value && (value.method === 'manual' || value.method === 'schedule') && Array.isArray(value.week) && value.week.length === 7 && value.week.every((slots: unknown) => Array.isArray(slots) && slots.every(slot => slot && typeof slot.start === 'string' && typeof slot.end === 'string') && !validateSlots(slots))) return value
+    const normalized = normalizeOpening(value)
+    if (value && Array.isArray(value.week) && value.week.length === 7 && normalized.week.every(slots => !validateSlots(slots))) return normalized
   } catch { /* Use manual mode until configured. */ }
   return emptyOpening()
 }
-export function effectiveMode(mode: OperationMode, opening: OpeningSettings, now = new Date()): OperationMode {
-  if (opening.method === 'manual' || mode !== 'open') return mode
+export function currentOpeningSlot(opening: OpeningSettings, now = new Date()): { day: number; slot: TimeSlot } | null {
+  if (opening.method !== 'schedule') return null
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now)
   const value = (type: string) => parts.find(part => part.type === type)?.value || ''
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday'))
   const time = `${value('hour')}:${value('minute')}`
-  return opening.week[day]?.some(slot => slot.start <= time && time < slot.end) ? 'open' : 'closed'
+  const slot = opening.week[day]?.find(item => item.start <= time && time < item.end)
+  return slot ? { day, slot } : null
+}
+export function effectiveMode(mode: OperationMode, opening: OpeningSettings, now = new Date()): OperationMode {
+  if (opening.method === 'manual' || mode !== 'open') return mode
+  return currentOpeningSlot(opening, now) ? 'open' : 'closed'
 }

@@ -16,6 +16,8 @@ export type AttendanceRecord = {
   direction: 'in' | 'out'
   timestamp: string
   mood?: MoodValue | null
+  plannedEndAt?: string | null
+  maxPlayMinutes?: number | null
 }
 
 export const STORAGE_KEY = 'wee-check-attendance-v1'
