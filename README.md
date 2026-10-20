@@ -32,34 +32,32 @@ Wee Check는 학생이 태블릿에서 자신의 이름을 눌러 들어오기·
 
 ## 교사용 빠른 시작
 
-### 1. 준비 사항
+### 1. 설치 및 준비 사항
 
-- Windows 10 또는 Windows 11
-- Node.js 20 이상
-- 학생용 공개 주소를 만들기 위한 인터넷 연결
+- 설치하는 PC: 64비트 Windows 10 또는 Windows 11, 인터넷 연결
+- 설치 파일을 만드는 개발 PC: Node.js 20 이상, Inno Setup 6
 
-### 2. Windows 배포본 만들기
+최종 설치 파일에는 Node.js 실행 환경과 Cloudflare Tunnel이 모두 포함됩니다. 따라서 교사가 사용하는 PC에는 Node.js나 `cloudflared`를 따로 설치할 필요가 없습니다.
 
-프로젝트 폴더에서 다음 명령을 실행합니다.
+### 2. Windows 설치 파일 만들기
+
+개발 PC에서 최초 한 번 Inno Setup과 Cloudflare Tunnel을 준비한 뒤 설치 파일을 만듭니다.
 
 ```powershell
+winget install --id JRSoftware.InnoSetup --exact
 npm install
-npm run package:windows
-```
-
-`release\Wee-Check-Windows` 폴더에 실행에 필요한 프론트엔드, 로컬 서버, Node.js 의존성 및 `cloudflared.exe`가 함께 준비됩니다. 패키징할 PC에 Cloudflare 실행 파일이 없다면 먼저 다음 명령을 실행합니다.
-
-```powershell
 .\scripts\install-cloudflared.ps1
+npm run installer:windows
 ```
+
+완성된 `release\WeeCheck-Setup-0.1.0.exe`를 설치할 PC로 옮겨 실행합니다. 설치 과정에서 **바탕화면 바로가기와 시작 메뉴 바로가기**가 자동으로 생성됩니다.
+
+> [!NOTE]
+> 현재 설치 파일은 코드 서명이 적용되지 않았으므로 Windows SmartScreen이 경고를 표시할 수 있습니다. 배포 전에 학교 또는 교육청의 소프트웨어 배포 정책을 확인하세요.
 
 ### 3. 프로그램 실행
 
-배포 폴더에서 다음 스크립트를 실행합니다.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-we-check.ps1
-```
+바탕화면의 **Wee Check** 바로가기를 실행합니다. 이미 실행 중이라면 서버를 중복으로 시작하지 않고 기존 관리자 화면을 엽니다. 시작 메뉴의 **Wee Check 종료**로 백그라운드 서버를 종료할 수 있습니다.
 
 한 번의 실행으로 다음 작업이 함께 진행됩니다.
 
@@ -174,6 +172,24 @@ npm start
 
 ## Windows 패키징 세부 사항
 
+단일 설치 파일은 다음 명령으로 만듭니다.
+
+```powershell
+npm run installer:windows
+```
+
+빌드 과정은 먼저 `release\Wee-Check-Windows`에 실행 패키지를 구성하고, 이어서 `release\WeeCheck-Setup-<버전>.exe`를 생성합니다. 설치 파일에는 다음 항목이 포함됩니다.
+
+- 프론트엔드와 로컬 서버
+- 검증된 Node.js 실행 파일과 런타임 의존성
+- `cloudflared.exe`
+- 실행·종료 스크립트와 Wee Check 아이콘
+- 바탕화면·시작 메뉴 바로가기 설정
+
+설치 제거 시 프로그램 파일과 바로가기는 삭제되지만 `%LOCALAPPDATA%\WeeCheck`의 데이터베이스와 백업은 보존됩니다.
+
+압축을 풀어 사용하는 폴더형 배포본만 필요하면 다음 명령을 사용합니다.
+
 ```powershell
 npm run package:windows
 ```
@@ -185,7 +201,7 @@ npm run package:windows
 3. 프로젝트의 `bin\cloudflared.exe`
 4. 시스템 `PATH`
 
-실행 파일을 찾지 못하거나 버전 확인에 실패하면 불완전한 배포본을 만들지 않고 패키징을 중단합니다. 정상 생성된 배포본은 대상 PC에 Cloudflare를 별도로 설치할 필요가 없습니다. 단, Node.js 20 이상은 필요합니다.
+실행 파일을 찾지 못하거나 버전 확인에 실패하면 불완전한 배포본을 만들지 않고 패키징을 중단합니다. 정상 생성된 설치 파일은 대상 PC에 Node.js나 Cloudflare를 별도로 설치할 필요가 없습니다.
 
 Windows 로그인 시 자동 시작이 필요하면 관리자 PowerShell에서 다음 스크립트를 실행합니다.
 
@@ -200,6 +216,8 @@ Windows 로그인 시 자동 시작이 필요하면 관리자 PowerShell에서 �
 | `WEE_CHECK_NO_TUNNEL` | `1`이면 Cloudflare 대신 로컬 학생 주소 사용 | 미설정 |
 | `WEE_CHECK_CLOUDFLARED_PATH` | 실행할 `cloudflared` 경로 직접 지정 | 동봉 파일 또는 PATH |
 | `WEE_CHECK_CLOUDFLARED_SOURCE` | Windows 패키징에 포함할 실행 파일 지정 | 자동 탐색 |
+| `WEE_CHECK_NODE_SOURCE` | Windows 패키징에 포함할 `node.exe` 지정 | 시스템 Node.js |
+| `WEE_CHECK_ISCC_PATH` | Inno Setup 컴파일러 `ISCC.exe` 경로 지정 | 자동 탐색 |
 | `WEE_CHECK_ADMIN_PORT` | 관리자 서버 포트 | `4173` |
 | `WEE_CHECK_STUDENT_PORT` | 학생 서버 포트 | `4174` |
 

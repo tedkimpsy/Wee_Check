@@ -9,6 +9,7 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build && tsc -p server/tsconfig.json",
     "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-package.ps1",
+    "installer:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1",
     "start": "node server-dist/server/index.js",
     "test": "vitest run"
   },
@@ -17,15 +18,10 @@
     "@fastify/rate-limit": "latest",
     "@fastify/static": "latest",
     "@primno/dpapi": "latest",
-    "@vitejs/plugin-react": "latest",
     "argon2": "latest",
     "better-sqlite3": "latest",
     "fastify": "latest",
-    "lucide-react": "latest",
-    "qrcode": "latest",
-    "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "qrcode": "latest"
   },
   "devDependencies": {
     "@types/better-sqlite3": "latest",
@@ -33,8 +29,13 @@
     "@types/qrcode": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
     "tsx": "latest",
     "typescript": "latest",
+    "vite": "latest",
     "vitest": "latest"
   }
 }
