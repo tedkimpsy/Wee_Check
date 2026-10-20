@@ -231,6 +231,19 @@ npm start
 
 관리자 화면의 `백업 · 학년도`에서 백업 목록을 확인합니다. 실제 파일은 `%LOCALAPPDATA%\WeeCheck\backups`에 저장됩니다.
 
+## 개발자
+
+Wee Check는 **서울특별시교육청 전문상담교사이자 학교심리학자인 김한석**이 제작했습니다.
+
+- 제작자: 김한석
+- 문의: [tedkim.psy@gmail.com](mailto:tedkim.psy@gmail.com)
+
+## 저작권 및 이용 안내
+
+Copyright © 2026 김한석. All rights reserved.
+
+**본 프로젝트의 소스 코드, 문서, 이미지 및 배포 파일은 무단 재배포할 수 없습니다.** 사용 또는 배포 허가가 필요한 경우 [tedkim.psy@gmail.com](mailto:tedkim.psy@gmail.com)으로 문의해 주세요.
+
 ## 기술 구성
 
 - React + TypeScript + Vite
