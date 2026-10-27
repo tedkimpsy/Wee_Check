@@ -1,0 +1,36 @@
+import { useEffect, useState } from 'react'
+import { CalendarDays, Check, Clock3, Plus, ToggleRight, Trash2, Users } from 'lucide-react'
+import Modal from './Modal'
+import { validateSlots, weekdays, type OpeningSettings as OpeningConfig, type TimeSlot } from './operation'
+
+const durationPresets = [15, 20, 30, 40]
+function DurationField({ value, onChange }: { value:number; onChange:(value:number)=>void }) {
+  return <div className="admin-v3-duration"><div>{durationPresets.map(minutes=><button type="button" key={minutes} className={value===minutes?'active':''} onClick={()=>onChange(minutes)}>{minutes}분</button>)}</div><label>직접 입력<input type="number" min="5" max="180" value={value} onChange={event=>onChange(Math.max(5,Math.min(180,Number(event.target.value)||5)))}/><span>분</span></label></div>
+}
+
+function DayEditor({ day, slots, grades, onSave, onClose }: { day:number; slots:TimeSlot[]; grades:string[]; onSave:(slots:TimeSlot[])=>Promise<void>; onClose:()=>void }) {
+  const [draft,setDraft]=useState(slots.map(slot=>({...slot,grades:[...slot.grades]}))),[error,setError]=useState(''),[busy,setBusy]=useState(false)
+  const update=(index:number,next:Partial<TimeSlot>)=>setDraft(draft.map((item,i)=>i===index?{...item,...next}:item))
+  const save=async()=>{const validation=validateSlots(draft);if(validation){setError(validation);return}setBusy(true);setError('');try{await onSave([...draft].sort((a,b)=>a.start.localeCompare(b.start)));onClose()}catch(reason){setError(reason instanceof Error?reason.message:'시간표를 저장하지 못했습니다.')}finally{setBusy(false)}}
+  return <Modal title={`${weekdays[day]}요일 개방 시간`} onClose={onClose}>
+    <p className="admin-v3-help">각 시간대의 이용 학년과 한 번 방문했을 때의 최대 놀이시간을 함께 정합니다. 학년을 고르지 않으면 전 학년이 대상입니다.</p>
+    <div className="admin-v3-slot-editor">{draft.map((slot,index)=><section key={index} className="admin-v3-slot-card"><header><strong>시간대 {index+1}</strong><button className="admin-v3-icon" aria-label="시간대 삭제" onClick={()=>setDraft(draft.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></header><div className="admin-v3-time-slot"><label>여는 시간<input type="time" value={slot.start} onChange={event=>update(index,{start:event.target.value})}/></label><span>—</span><label>닫는 시간<input type="time" value={slot.end} onChange={event=>update(index,{end:event.target.value})}/></label></div><div className="admin-v3-slot-section"><span><Users size={16}/> 이용 대상 학년</span><div className="admin-v3-grade-picks">{grades.map(grade=><button type="button" key={grade} className={slot.grades.includes(grade)?'active':''} onClick={()=>update(index,{grades:slot.grades.includes(grade)?slot.grades.filter(item=>item!==grade):[...slot.grades,grade]})}>{grade}</button>)}</div><small>{slot.grades.length?slot.grades.join(', '):'전 학년'} · 빈자리이고 대기가 없으면 다른 학년도 이용할 수 있습니다.</small></div><div className="admin-v3-slot-section"><span><Clock3 size={16}/> 1회 최대 놀이시간</span><DurationField value={slot.maxPlayMinutes} onChange={value=>update(index,{maxPlayMinutes:value})}/></div></section>)}</div>
+    {!draft.length&&<p className="admin-v3-help">등록된 개방 시간이 없습니다.</p>}
+    <button className="admin-v3-secondary" onClick={()=>setDraft([...draft,{start:'09:00',end:'10:00',grades:[],maxPlayMinutes:30}])}><Plus size={17}/> 시간대 추가</button>
+    {error&&<p className="admin-v3-form-error" role="alert">{error}</p>}
+    <div className="admin-v3-form-actions split"><button className="admin-v3-secondary" onClick={onClose}>취소</button><button className="admin-v3-primary" disabled={busy} onClick={()=>void save()}>{busy?'저장 중…':'시간표 저장'}</button></div>
+  </Modal>
+}
+
+export default function OpeningSettings({ opening, grades, onSave }: { opening:OpeningConfig; grades:string[]; onSave:(opening:OpeningConfig)=>Promise<void> }) {
+  const [day,setDay]=useState<number|null>(null),[status,setStatus]=useState<'idle'|'saving'|'success'|'error'>('idle'),[message,setMessage]=useState('')
+  useEffect(()=>{if(status!=='success')return;const timer=window.setTimeout(()=>{setStatus('idle');setMessage('')},4000);return()=>window.clearTimeout(timer)},[status])
+  const save=async(next:OpeningConfig,success:string)=>{setStatus('saving');setMessage('');try{await onSave(next);setStatus('success');setMessage(success)}catch(reason){setStatus('error');setMessage(reason instanceof Error?reason.message:'설정을 저장하지 못했습니다.')}}
+  return <>
+    <div className="admin-v3-capacity-settings"><div><span><Users size={20}/><strong>정원 제한</strong><small>현재 이용 학생과 입실 예약을 함께 계산합니다.</small></span><button className={`admin-v3-toggle ${opening.capacity.enabled?'on':''}`} role="switch" aria-checked={opening.capacity.enabled} onClick={()=>void save({...opening,capacity:{...opening.capacity,enabled:!opening.capacity.enabled}},opening.capacity.enabled?'정원 제한을 껐습니다.':'정원 제한을 켰습니다.')}><i/></button></div><div className="admin-v3-capacity-fields"><label>공통 정원<input type="number" min="1" max="99" value={opening.capacity.limit} onChange={event=>void save({...opening,capacity:{...opening.capacity,limit:Math.max(1,Math.min(99,Number(event.target.value)||1))}},'정원을 변경했습니다.')}/><span>명</span></label><section><strong>수동 개방 최대 놀이시간</strong><DurationField value={opening.capacity.manualMaxPlayMinutes} onChange={value=>void save({...opening,capacity:{...opening.capacity,manualMaxPlayMinutes:value}},'수동 개방 놀이시간을 변경했습니다.')}/></section></div></div>
+    <div className="opening-methods admin-v3-opening-methods" role="group" aria-label="개방 방식"><button disabled={status==='saving'} className={`opening-method ${opening.method==='manual'?'selected':''}`} aria-pressed={opening.method==='manual'} onClick={()=>void save({...opening,method:'manual'},'수동 개방으로 변경했습니다.')}><ToggleRight size={24}/><span><strong>수동 개방</strong><small>관리자가 직접 열고 닫습니다.</small></span>{opening.method==='manual'&&<Check size={18}/>}</button><button disabled={status==='saving'} className={`opening-method ${opening.method==='schedule'?'selected':''}`} aria-pressed={opening.method==='schedule'} onClick={()=>void save({...opening,method:'schedule'},'요일별 시간표를 적용했습니다.')}><CalendarDays size={24}/><span><strong>요일별 시간표</strong><small>시간대별 학년과 놀이시간을 적용합니다.</small></span>{opening.method==='schedule'&&<Check size={18}/>}</button></div>
+    {status==='error'&&<p className="admin-v3-form-error" role="alert">{message}</p>}{status==='success'&&<p className="admin-v3-form-success" role="status"><Check size={16}/>{message}</p>}
+    {opening.method==='manual'?<div className="admin-v3-opening-hint"><ToggleRight size={28}/><span><strong>상단 운영 상태에서 개방 여부를 바꿉니다.</strong><p>수동 개방 중에는 위에서 지정한 최대 놀이시간을 적용합니다.</p></span></div>:<><p className="admin-v3-help">요일별 개방 시간, 대상 학년, 최대 놀이시간을 설정합니다.</p><div className="admin-v3-week">{[1,2,3,4,5,6,0].map(weekDay=><div key={weekDay}><strong>{weekdays[weekDay]}요일</strong><span>{opening.week[weekDay].length?opening.week[weekDay].map(slot=>`${slot.start}–${slot.end} · ${slot.grades.length?slot.grades.join(', '):'전 학년'} · ${slot.maxPlayMinutes}분`).join(' / '):'닫힘'}</span><button className="admin-v3-secondary" onClick={()=>setDay(weekDay)}>{opening.week[weekDay].length?'수정':'시간 추가'}</button></div>)}</div></>}
+    {day!==null&&<DayEditor day={day} slots={opening.week[day]} grades={grades} onClose={()=>setDay(null)} onSave={slots=>onSave({...opening,week:opening.week.map((old,index)=>index===day?slots:old)})}/>}
+  </>
+}

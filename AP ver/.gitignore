@@ -1,0 +1,13 @@
+node_modules
+dist
+server-dist
+coverage
+.DS_Store
+*.local
+*.tsbuildinfo
+.ui-test-data/
+release/
+vite.config.js
+vite.config.d.ts
+named-tunnel.json
+bin/cloudflared.exe
