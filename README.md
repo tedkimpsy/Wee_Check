@@ -6,6 +6,30 @@ Wee Check는 학생이 태블릿에서 자신의 이름을 눌러 들어오기·
 
 ![Wee Check 학생 화면](docs/images/student-home.png)
 
+## 배포판 선택
+
+이 저장소는 접속 환경에 따라 두 가지 배포판을 제공합니다.
+
+| 배포판 | 학생 접속 방식 | 적합한 환경 |
+| --- | --- | --- |
+| 기본판 | Cloudflare Quick Tunnel을 통한 임시 공개 주소 | 서로 다른 네트워크에서 접속해야 하는 환경 |
+| [Wee Check AP](AP%20ver/README.md) | 같은 학교 Wi-Fi AP의 사설 IP 주소 | 학교가 관리하는 WPA2/WPA3 보안 AP 안에서만 사용하는 환경 |
+
+학교 보안 AP 안에서 노트북과 학생 기기를 함께 연결한다면 **Wee Check AP**를 사용합니다. 이 버전은 Cloudflare Tunnel을 실행하지 않으며, 관리자 화면은 노트북의 `127.0.0.1:4173`에서만 열고 학생 화면만 `4174/TCP`로 같은 로컬 서브넷에 제공합니다. 학생 정보와 상담 기록은 `%LOCALAPPDATA%\WeeCheckAP`의 암호화된 로컬 데이터베이스에 저장되며 외부 클라우드로 전송하지 않습니다.
+
+### Wee Check AP 배포용 EXE
+
+- 설치 파일: [`WeeCheck-AP-Setup-0.1.2.exe`](AP%20ver/release/WeeCheck-AP-Setup-0.1.2.exe)
+- SHA-256: `5E757393DE24F0BB28620E85D3E0F4DEE4C29DB9773819784FF05590B9317ACD`
+- 지원 운영체제: 64비트 Windows 10/11
+- 설치 흐름: 설치 안내 및 위치 선택 → 방화벽 설정 이유 안내 → 해당 단계에서만 Windows 관리자 권한 요청 → 바탕화면·시작 메뉴 바로가기 생성
+- 방화벽 범위: 번들된 Wee Check 전용 `node.exe`의 `4174/TCP`만 허용하며, 원격 주소는 `LocalSubnet`으로 제한
+- 프로그램 종료: 서버 프로세스와 `4173`, `4174`, `5173` 리스너를 종료·확인하므로 학생 접속 포트가 더 이상 열리지 않음
+- 제거: 프로그램과 전용 방화벽 규칙을 삭제하되, 실수로 기록을 잃지 않도록 `%LOCALAPPDATA%\WeeCheckAP` 데이터는 보존
+
+> [!IMPORTANT]
+> AP 버전은 학교가 관리하는 암호화된 Wi-Fi에서만 사용하세요. AP의 `클라이언트 격리` 또는 `무선 단말 간 통신 차단`이 켜져 있으면 같은 Wi-Fi에서도 학생 기기가 접속할 수 없습니다. 현재 EXE에는 코드 서명이 없으므로 Windows SmartScreen 경고가 표시될 수 있으며, 학교·교육청의 소프트웨어 배포 정책을 먼저 확인해야 합니다.
+
 ## 핵심 기능
 
 | 영역 | 제공 기능 |
@@ -35,22 +59,31 @@ Wee Check는 학생이 태블릿에서 자신의 이름을 눌러 들어오기·
 ### 1. 설치 및 준비 사항
 
 - 설치하는 PC: 64비트 Windows 10 또는 Windows 11, 인터넷 연결
-- 설치 파일을 만드는 개발 PC: Node.js 20 이상, Inno Setup 6
+- 설치 파일을 만드는 개발 PC: Node.js 20 이상, Inno Setup 7 64비트판
 
-최종 설치 파일에는 Node.js 실행 환경과 Cloudflare Tunnel이 모두 포함됩니다. 따라서 교사가 사용하는 PC에는 Node.js나 `cloudflared`를 따로 설치할 필요가 없습니다.
+최종 설치 파일에는 Node.js 실행 환경이 포함됩니다. `cloudflared`는 Wee Check 설치 과정에서 Cloudflare 공식 GitHub 최신 릴리스를 내려받고 디지털 서명과 SHA-256을 검증한 뒤 앱 전용 폴더에 설치하므로, 교사가 별도로 설치할 필요는 없습니다. 최초 설치에는 인터넷 연결이 필요합니다.
+
+학생용 공개 주소는 Cloudflare Quick Tunnel이 실행할 때마다 자동으로 발급합니다. Cloudflare 계정, 개별 도메인, Tunnel 토큰은 필요하지 않습니다. 주소는 실행할 때마다 바뀌므로 관리자 화면에 표시된 당일 QR을 학생에게 안내합니다.
 
 ### 2. Windows 설치 파일 만들기
 
-개발 PC에서 최초 한 번 Inno Setup과 Cloudflare Tunnel을 준비한 뒤 설치 파일을 만듭니다.
+개발 PC에서 Inno Setup을 준비한 뒤 설치 파일을 만듭니다. `cloudflared.exe`는 설치 파일에 포함하지 않습니다.
 
 ```powershell
-winget install --id JRSoftware.InnoSetup --exact
+winget install --id JRSoftware.InnoSetup.7 -e -s winget -i
 npm install
-.\scripts\install-cloudflared.ps1
 npm run installer:windows
 ```
 
-완성된 `release\WeeCheck-Setup-0.1.0.exe`를 설치할 PC로 옮겨 실행합니다. 설치 과정에서 **바탕화면 바로가기와 시작 메뉴 바로가기**가 자동으로 생성됩니다.
+완성된 `release\WeeCheck-Setup-<버전>.exe`를 설치할 PC로 옮겨 실행합니다. 설치 과정에서 **바탕화면 바로가기와 시작 메뉴 바로가기**가 자동으로 생성됩니다.
+
+설치 없이 한 파일을 더블클릭해 실행하려면 다음 명령으로 `release\WeeCheck-Portable-<버전>.exe`를 만듭니다.
+
+```powershell
+npm run portable:windows
+```
+
+Portable EXE는 실행에 필요한 파일을 `%LOCALAPPDATA%\Programs\WeeCheckPortable\<버전>`에 자동으로 풀고 Wee Check를 시작합니다. 학생·상담 기록과 설정은 설치판과 동일하게 `%LOCALAPPDATA%\WeeCheck`에 암호화하여 저장합니다.
 
 > [!NOTE]
 > 현재 설치 파일은 코드 서명이 적용되지 않았으므로 Windows SmartScreen이 경고를 표시할 수 있습니다. 배포 전에 학교 또는 교육청의 소프트웨어 배포 정책을 확인하세요.
@@ -151,6 +184,8 @@ npm install
 npm run dev
 ```
 
+`npm run dev` 하나만 실행하면 현재 PowerShell 창 안에서 로컬 관리자·학생 서버, Vite 개발 서버, Cloudflare Quick Tunnel이 순서대로 시작됩니다. 준비가 끝나면 개발 화면과 학생 공개 주소가 같은 창에 표시되며, `Ctrl+C`를 누르면 관련 프로세스가 함께 종료됩니다.
+
 - Vite 개발 화면: `http://127.0.0.1:5173`
 - 관리자 서버: `http://127.0.0.1:4173/admin`
 - 학생 서버: `http://127.0.0.1:4174` — 유효한 학생 접속 토큰 필요
@@ -182,7 +217,7 @@ npm run installer:windows
 
 - 프론트엔드와 로컬 서버
 - 검증된 Node.js 실행 파일과 런타임 의존성
-- `cloudflared.exe`
+- 설치 중 Cloudflare 공식 릴리스에서 최신 `cloudflared.exe`를 내려받아 검증하는 스크립트
 - 실행·종료 스크립트와 Wee Check 아이콘
 - 바탕화면·시작 메뉴 바로가기 설정
 
@@ -194,14 +229,7 @@ npm run installer:windows
 npm run package:windows
 ```
 
-패키징 과정은 `cloudflared.exe`를 다음 순서로 찾습니다.
-
-1. `-CloudflaredSource` 인수
-2. `WEE_CHECK_CLOUDFLARED_SOURCE` 환경 변수
-3. 프로젝트의 `bin\cloudflared.exe`
-4. 시스템 `PATH`
-
-실행 파일을 찾지 못하거나 버전 확인에 실패하면 불완전한 배포본을 만들지 않고 패키징을 중단합니다. 정상 생성된 설치 파일은 대상 PC에 Node.js나 Cloudflare를 별도로 설치할 필요가 없습니다.
+설치 프로그램은 설치 시점의 최신 Windows 64비트 `cloudflared.exe`를 공식 GitHub 릴리스에서 받습니다. 내려받은 파일의 GitHub SHA-256 정보가 제공되면 해시를 대조하고, 항상 Cloudflare Inc.의 Authenticode 서명을 검증합니다. 검증이나 다운로드에 실패하면 Wee Check 실행을 진행하지 않습니다.
 
 Windows 로그인 시 자동 시작이 필요하면 관리자 PowerShell에서 다음 스크립트를 실행합니다.
 
@@ -214,8 +242,7 @@ Windows 로그인 시 자동 시작이 필요하면 관리자 PowerShell에서 �
 | 변수 | 설명 | 기본값 |
 | --- | --- | --- |
 | `WEE_CHECK_NO_TUNNEL` | `1`이면 Cloudflare 대신 로컬 학생 주소 사용 | 미설정 |
-| `WEE_CHECK_CLOUDFLARED_PATH` | 실행할 `cloudflared` 경로 직접 지정 | 동봉 파일 또는 PATH |
-| `WEE_CHECK_CLOUDFLARED_SOURCE` | Windows 패키징에 포함할 실행 파일 지정 | 자동 탐색 |
+| `WEE_CHECK_CLOUDFLARED_PATH` | 실행할 `cloudflared` 경로 직접 지정 | 앱 전용 설치 파일 또는 PATH |
 | `WEE_CHECK_NODE_SOURCE` | Windows 패키징에 포함할 `node.exe` 지정 | 시스템 Node.js |
 | `WEE_CHECK_ISCC_PATH` | Inno Setup 컴파일러 `ISCC.exe` 경로 지정 | 자동 탐색 |
 | `WEE_CHECK_ADMIN_PORT` | 관리자 서버 포트 | `4173` |
@@ -236,7 +263,8 @@ npm start
 
 - 인터넷 연결을 확인합니다.
 - 배포 폴더의 `bin\cloudflared.exe`가 존재하는지 확인합니다.
-- `npm run package:windows`를 다시 실행해 완전한 배포본을 만듭니다.
+- Wee Check는 Quick Tunnel 연결을 최대 3회 자동으로 다시 시도합니다. 실제 실행 기록은 `%LOCALAPPDATA%\WeeCheck\logs\cloudflared.log`에서 확인할 수 있습니다.
+- 인터넷에 연결한 상태에서 `scripts\install-cloudflared.ps1`을 실행하거나 Wee Check 설치 프로그램을 다시 실행합니다.
 - 로컬 점검이라면 `WEE_CHECK_NO_TUNNEL=1`을 사용합니다.
 
 ### 관리자에서 바꾼 상태가 학생 화면에 반영되지 않음

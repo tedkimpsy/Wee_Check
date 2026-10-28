@@ -24,8 +24,11 @@ try {
   if ($found) { $candidates += $found.Source }
   $compiler = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
   if (-not $compiler) { throw 'Inno Setup 7 was not found. Install the recommended 64-bit edition with: winget install --id JRSoftware.InnoSetup.7 -e -s winget -i' }
-  $compilerVersion = (Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion
-  $compilerMajor = [int]([regex]::Match($compilerVersion, '^(\d+)').Groups[1].Value)
+  $compilerVersion = (& $compiler '--version' 2>&1 | Select-Object -First 1).ToString().Trim()
+  if ($LASTEXITCODE -ne 0 -or $compilerVersion -notmatch '^(\d+)') {
+    throw "Unable to determine the Inno Setup compiler version at $compiler"
+  }
+  $compilerMajor = [int]$Matches[1]
   if ($compilerMajor -lt 7) { throw "Inno Setup 7 or later is required. Found: $compilerVersion at $compiler" }
 
   & $compiler '/Qp' "/DMyAppVersion=$version" $definition
