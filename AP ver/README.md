@@ -57,13 +57,13 @@ npm run installer:windows
 
 설치판은 현재 Windows 사용자 계정에 로그인할 때 자동으로 실행됩니다. 자동 실행은 Windows 설정의 앱 → 시작 프로그램에서 끌 수 있으며, 설치 제거 시 자동 실행 바로가기도 제거됩니다.
 
-설치 없이 폴더에서 실행하려면 다음 명령으로 `release\WeeCheck-AP-Portable-<버전>.zip`을 만듭니다.
+설치 없이 바로 실행하려면 다음 명령으로 `release\WeeCheck-AP-Portable-<버전>.exe`를 만듭니다.
 
 ```powershell
 npm run portable:windows
 ```
 
-포터블 ZIP을 모두 압축 해제한 뒤 `Wee-Check-Windows\WeeCheck-Start.vbs`를 더블클릭합니다. 종료할 때는 `WeeCheck-Stop.vbs`를 실행합니다. 설치 마법사·설치된 앱·시작프로그램 등록은 하지 않으므로 PC를 다시 시작하면 매번 직접 실행합니다. 최초 실행과 폴더 이동 후에는 방화벽 권한 안내가 나타날 수 있습니다. 학생·상담 기록과 설정은 설치판과 동일하게 해당 PC의 `%LOCALAPPDATA%\WeeCheckAP`에 암호화하여 저장되며, 프로그램 폴더를 USB로 옮겨도 데이터는 이동하지 않습니다. 같은 PC에서는 설치판과 포터블판 중 하나만 실행하세요.
+포터블 EXE를 더블클릭하면 실행 파일을 `%LOCALAPPDATA%\WeeCheckAPPortableCache`에 자동 준비하고 관리자 화면을 엽니다. 별도 압축 해제와 설치 마법사는 없습니다. 종료할 때는 실행 창 또는 알림 영역 아이콘의 종료를 누릅니다. 설치된 앱·시작프로그램 등록은 하지 않으므로 PC를 다시 시작하면 매번 직접 실행합니다. 최초 실행 시 방화벽 권한 안내가 나타날 수 있습니다. 학생·상담 기록과 설정은 해당 PC의 `%LOCALAPPDATA%\WeeCheckAP`에 보관하며, EXE를 USB로 옮겨도 데이터는 이동하지 않습니다. 같은 PC에서는 설치판과 포터블판 중 하나만 실행하세요.
 
 > [!NOTE]
 > 현재 설치 파일은 코드 서명이 적용되지 않았으므로 Windows SmartScreen이 경고를 표시할 수 있습니다. 배포 전에 학교 또는 교육청의 소프트웨어 배포 정책을 확인하세요.
