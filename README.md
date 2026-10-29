@@ -18,9 +18,14 @@ Wee Check AP는 학교 전문상담교사를 위한 Windows 프로그램입니�
 
 ## 내려받고 시작하기
 
-**[Windows 설치 파일 내려받기](AP%20ver/release/WeeCheck-AP-Setup-0.1.2.exe)** · 버전 0.1.2 · 약 33MB
+| 배포판 | 다운로드 | 실행 방식 |
+| --- | --- | --- |
+| 설치판 | [설치 EXE 0.1.3](AP%20ver/release/WeeCheck-AP-Setup-0.1.3.exe) | 한 번 설치하면 현재 Windows 계정에 로그인할 때 자동 실행 |
+| 포터블판 | [포터블 ZIP 0.1.3](AP%20ver/release/WeeCheck-AP-Portable-0.1.3.zip) | 전체 압축 해제 후 `WeeCheck-Start.vbs`를 매번 직접 실행 |
 
-파일 화면에서 **Download raw file**을 눌러 내려받으세요. 64비트 Windows 10/11과 학교가 관리하는 보안 Wi-Fi가 필요합니다. 처음 설치할 때 관리자 권한이 필요할 수 있습니다.
+파일 화면에서 **Download raw file**을 눌러 내려받으세요. 64비트 Windows 10/11과 학교가 관리하는 보안 Wi-Fi가 필요합니다. 두 버전 모두 학생 기기 접속을 위한 방화벽 설정 시 관리자 권한이 필요할 수 있습니다. 포터블판은 설치와 자동 실행 등록을 하지 않습니다.
+
+같은 노트북에서 두 버전을 동시에 사용하지 마세요. 데이터는 두 버전 모두 해당 PC에 보관하며, 포터블 파일을 USB로 옮겨도 학생 데이터가 함께 이동하지 않습니다.
 
 1. [설치 안내](docs/manual/installation.md)를 따라 프로그램을 설치합니다.
 2. [처음 실행 안내](docs/manual/first-steps.md)에 따라 로그인하고 학교와 학생 정보를 준비합니다.

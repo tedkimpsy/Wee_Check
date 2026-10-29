@@ -42,6 +42,7 @@ Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Source: "..\release\Wee-Check-Windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
+Name: "{userstartup}\Wee Check AP"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\start-we-check.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\WeeCheck.ico"; Comment: "Windows 로그인 시 Wee Check AP 자동 실행"
 Name: "{autoprograms}\Wee Check AP"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\start-we-check.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\WeeCheck.ico"; Comment: "Wee Check AP 관리자 실행"
 Name: "{autodesktop}\Wee Check AP"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\start-we-check.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\WeeCheck.ico"; Comment: "Wee Check AP 관리자 실행"
 Name: "{autoprograms}\Wee Check AP 종료"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\stop-we-check.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\WeeCheck.ico"
